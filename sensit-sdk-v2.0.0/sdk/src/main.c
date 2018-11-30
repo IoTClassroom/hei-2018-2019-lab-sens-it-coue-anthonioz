@@ -1,11 +1,10 @@
 /*!******************************************************************
- * \file main.c
- * \brief Sens'it SDK template
+ * \file main_LIGHT.c
+ * \brief Sens'it Discovery mode Light demonstration code
  * \author Sens'it Team
  * \copyright Copyright (c) 2018 Sigfox, All Rights Reserved.
  *
- * This file is an empty main template.
- * You can use it as a basis to develop your own firmware.
+ * For more information on this firmware, see light.md.
  *******************************************************************/
 /******* INCLUDES **************************************************/
 #include "sensit_types.h"
@@ -14,13 +13,16 @@
 #include "button.h"
 #include "battery.h"
 #include "radio_api.h"
-#include "hts221.h"
 #include "ltr329.h"
-#include "fxos8700.h"
+#include "discovery.h"
+
+
+/******** DEFINES **************************************************/
+#define MEASUREMENT_PERIOD                 10/* Measurement & Message sending period, in second */
 
 
 /******* GLOBAL VARIABLES ******************************************/
-u8 firmware_version[] = "TEMPLATE";
+u8 firmware_version[] = "LIGHT_v2.0.0";
 
 
 /*******************************************************************/
@@ -29,7 +31,12 @@ int main()
 {
     error_t err;
     button_e btn;
-    u16 battery_level;
+    bool send = FALSE;
+    u16 trash;
+
+    /* Discovery payload variable */
+    discovery_data_s data = {0};
+    discovery_payload_s payload;
 
     /* Start of initialization */
 
@@ -40,17 +47,12 @@ int main()
     err = RADIO_API_init();
     ERROR_parser(err);
 
-    /* Initialize temperature & humidity sensor */
-    err = HTS221_init();
-    ERROR_parser(err);
-
     /* Initialize light sensor */
     err = LTR329_init();
     ERROR_parser(err);
 
-    /* Initialize accelerometer */
-    err = FXOS8700_init();
-    ERROR_parser(err);
+    /* Initialize RTC alarm timer */
+    SENSIT_API_set_rtc_alarm(MEASUREMENT_PERIOD);
 
     /* Clear pending interrupt */
     pending_interrupt = 0;
@@ -62,11 +64,32 @@ int main()
         /* Execution loop */
 
         /* Check of battery level */
-        BATTERY_handler(&battery_level);
+        BATTERY_handler(&(data.battery));
 
         /* RTC alarm interrupt handler */
         if ((pending_interrupt & INTERRUPT_MASK_RTC) == INTERRUPT_MASK_RTC)
         {
+            /* Active light sensor */
+            LTR329_set_active_mode(LTR329_GAIN_96X);
+            /* Do a brightness measurement */
+            err = LTR329_measure(&(data.brightness), &trash);
+            /* Sensor back in standby mode */
+            LTR329_set_standby_mode();
+
+            if (err != LTR329_ERR_NONE)
+            {
+                ERROR_parser(err);
+            }
+            else
+            {
+                if(data.brightness>100){
+                /* Set send flag */
+                send = TRUE;
+                SENSIT_API_set_rgb_led(RGB_RED);
+                }else{send=FALSE;
+                }
+            }
+
             /* Clear interrupt */
             pending_interrupt &= ~INTERRUPT_MASK_RTC;
         }
@@ -75,7 +98,7 @@ int main()
         if ((pending_interrupt & INTERRUPT_MASK_BUTTON) == INTERRUPT_MASK_BUTTON)
         {
             /* RGB Led ON during count of button presses */
-            SENSIT_API_set_rgb_led(RGB_WHITE);
+            SENSIT_API_set_rgb_led(RGB_YELLOW);
 
             /* Count number of presses */
             btn = BUTTON_handler();
@@ -83,7 +106,15 @@ int main()
             /* RGB Led OFF */
             SENSIT_API_set_rgb_led(RGB_OFF);
 
-            if (btn == BUTTON_FOUR_PRESSES)
+            if (btn == BUTTON_TWO_PRESSES)
+            {
+                /* Set button flag to TRUE */
+                data.button = TRUE;
+
+                /* Force a RTC alarm interrupt to do a new measurement */
+                pending_interrupt |= INTERRUPT_MASK_RTC;
+            }
+            else if (btn == BUTTON_FOUR_PRESSES)
             {
                 /* Reset the device */
                 SENSIT_API_reset();
@@ -105,6 +136,24 @@ int main()
         {
             /* Clear interrupt */
             pending_interrupt &= ~INTERRUPT_MASK_FXOS8700;
+        }
+
+        /* Check if we need to send a message */
+        if (send == TRUE)
+        {
+            /* Build the payload */
+            DISCOVERY_build_payload(&payload, MODE_LIGHT, &data);
+
+            /* Send the message */
+            err = RADIO_API_send_message(RGB_YELLOW, (u8*)&payload, DISCOVERY_PAYLOAD_SIZE, FALSE, NULL);
+            /* Parse the error code */
+            ERROR_parser(err);
+
+            /* Clear button flag */
+            data.button = FALSE;
+
+            /* Clear send flag */
+            send = FALSE;
         }
 
         /* Check if all interrupt have been clear */
