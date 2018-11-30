@@ -18,7 +18,7 @@
 
 
 /******** DEFINES **************************************************/
-#define MEASUREMENT_PERIOD                 3600 /* Measurement & Message sending period, in second */
+#define MEASUREMENT_PERIOD                 10/* Measurement & Message sending period, in second */
 
 
 /******* GLOBAL VARIABLES ******************************************/
@@ -82,8 +82,12 @@ int main()
             }
             else
             {
+                if(data.brightness>100){
                 /* Set send flag */
                 send = TRUE;
+                SENSIT_API_set_rgb_led(RGB_RED);
+                }else{send=FALSE;
+                }
             }
 
             /* Clear interrupt */

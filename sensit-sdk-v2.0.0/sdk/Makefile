@@ -30,9 +30,9 @@ SIZE_OUTPUT = $(OUTPUT_NAME).siz
 # ---------
 # TOOLCHAIN
 # ---------
-CC = arm-none-eabi-gcc
-BIN_TOOL  = arm-none-eabi-objcopy
-SIZE_TOOL = arm-none-eabi-size
+CC =/Users/julesanthonioz/Desktop/TP-n2-Sens-It/gcc-arm-none-eabi-7-2018-q2-update/bin/arm-none-eabi-gcc
+BIN_TOOL  =/Users/julesanthonioz/Desktop/TP-n2-Sens-It/gcc-arm-none-eabi-7-2018-q2-update/bin/arm-none-eabi-objcopy
+SIZE_TOOL =/Users/julesanthonioz/Desktop/TP-n2-Sens-It/gcc-arm-none-eabi-7-2018-q2-update/bin/arm-none-eabi-size
 
 
 # -------------------
@@ -190,4 +190,4 @@ dir:
 
 # Rule for USB flashing using dfu file manager (vendor id 0483)
 prog:
-	dfu-util -a 0 -s 0x08000000:leave -D $(BIN_PATH)/$(BIN_OUTPUT)
+	dfu-util -a 0 -s 0x08000000:leave -D $(BIN_PATH)/$(BIN_OUTPUT) -i 0
